@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Metrónomo de práctica — PWA</title>
+
+  <!-- PWA basics -->
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.webmanifest" />
+
+  <style>
+    :root{
+      --bg:#0b1220;
+      --panel:#101a2e;
+      --muted:#8aa0c2;
+      --ring:rgba(255,255,255,.09);
+      --accent:#32d296;
+      --accent2:#38bdf8;
+      --text:#e6eefc;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background:radial-gradient(1200px 600px at 5% -10%, #18305322, transparent 60%), var(--bg);
+      color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans";
+    }
+    .wrap{max-width:1100px;margin:0 auto;padding:24px;min-height:100vh;display:grid;gap:24px;grid-template-columns:1.8fr 1fr}
+    @media (max-width: 900px){ .wrap{grid-template-columns:1fr} }
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.03), transparent), var(--panel);
+      border-radius:18px;
+      padding:18px;
+      box-shadow:0 20px 60px #0006, inset 0 0 0 1px var(--ring);
+    }
+    h1{font-size:20px;margin:0;letter-spacing:.2px}
+    .muted{color:var(--muted);font-size:12px}
+    .row{display:grid;gap:16px;grid-template-columns:1fr 1fr}
+    .controls{display:flex;flex-direction:column;gap:14px}
+    .group{padding:12px;border-radius:12px;background:#0d1628;box-shadow:inset 0 0 0 1px var(--ring)}
+    label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+    input[type=number], select{
+      width:100%;padding:8px 10px;border-radius:10px;background:#0b1426;border:1px solid var(--ring);color:var(--text);
+      font-size:14px; text-align:right;
+    }
+    input[type=range]{width:100%}
+    .hstack{display:flex;gap:8px;align-items:center}
+    .hstack.end{justify-content:flex-end}
+    .btn{
+      appearance:none;border:0;background:#0b1426;border:1px solid var(--ring);color:var(--text);
+      padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:600;
+    }
+    .btn:hover{filter:brightness(1.1)}
+    .btn.primary{background:var(--accent);color:#053224;border-color:transparent}
+    .btn.warn{background:#fbbf24;color:#2b1b00;border-color:transparent}
+    .btn.gray{background:#0d1628}
+    .numbers{font-variant:tabular-nums;letter-spacing:.5px}
+    .title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .mode{font-weight:800}
+    .mode.practice{color:var(--accent)}
+    .mode.rest{color:var(--accent2)}
+    .timer{font-size:56px;font-weight:900;text-align:center;margin-top:6px}
+    .mini{font-size:12px;color:var(--muted);text-align:center}
+    .pulse{
+      width:180px;height:180px;border-radius:999px;margin:16px auto;
+      position:relative;background:radial-gradient(circle at 50% 50%, rgba(255,255,255,.12), transparent 60%);
+      box-shadow:inset 0 0 0 2px rgba(255,255,255,.08);
+    }
+    .pulse::after{
+      content:""; position:absolute; inset:0; border-radius:inherit;
+      transform:scale(.88); opacity:.6;
+      transition:transform .08s cubic-bezier(.2,.8,.2,1), opacity .08s linear;
+      box-shadow:0 0 0 3px rgba(255,255,255,.09), 0 0 80px 10px rgba(56,189,248,.08);
+    }
+    .pulse.accent::after{ box-shadow:0 0 0 3px rgba(255,255,255,.12), 0 0 100px 16px rgba(50,210,150,.25) }
+    .pulse.active::after{ transform:scale(1.05); opacity:1 }
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+    .right .group{margin-bottom:10px}
+    .spacer{height:8px}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .footer{font-size:11px;color:#9db4d3;opacity:.9;text-align:center;margin-top:10px}
+
+    /* Botón de instalar (aparece si el navegador lo permite) */
+    #installBtn{
+      position:fixed; right:18px; bottom:18px;
+      display:none; z-index:1000;
+      box-shadow:0 10px 30px rgba(0,0,0,.35);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="card left">
+      <div class="title-row">
+        <h1>Metrónomo de práctica</h1>
+        <div class="muted">WebAudio • PWA</div>
+      </div>
+
+      <div class="row">
+        <div class="card" style="min-height:420px">
+          <div class="muted" style="text-align:center;text-transform:uppercase;letter-spacing:.18em">Modo</div>
+          <div id="modeLabel" class="mode practice" style="text-align:center">PRÁCTICA</div>
+
+          <div id="pulse" class="pulse"></div>
+
+          <div id="timer" class="timer numbers">01:00</div>
+          <div class="mini">
+            Ronda <span id="roundInfo" class="numbers mono">-</span>
+            &nbsp;•&nbsp;
+            Compás <span id="beatInfo" class="numbers mono">1/4</span>
+            &nbsp;•&nbsp;
+            Sub <span id="subInfo" class="numbers mono">1/1</span>
+          </div>
+
+          <div class="spacer"></div>
+
+          <div class="grid2">
+            <button id="btnStart" class="btn primary">Iniciar</button>
+            <button id="btnPause" class="btn warn" disabled>Pausar</button>
+            <button id="btnResume" class="btn primary" style="display:none">Reanudar</button>
+            <button id="btnStop" class="btn gray">Detener</button>
+          </div>
+
+          <div class="grid2" style="margin-top:8px">
+            <button id="btnReset" class="btn gray">Reset</button>
+            <button id="btnTap" class="btn gray">Tap Tempo</button>
+          </div>
+        </div>
+
+        <div class="controls">
+          <div class="group">
+            <label>BPM</label>
+            <div class="hstack" style="gap:10px;margin-top:6px">
+              <input id="bpmRange" type="range" min="20" max="300" step="1">
+              <input id="bpmInput" type="number" min="20" max="300">
+            </div>
+            <div class="hstack" style="margin-top:6px">
+              <button class="btn gray" id="bpmMinus">–</button>
+              <button class="btn gray" id="bpmPlus">+</button>
+            </div>
+          </div>
+
+          <div class="group">
+            <label>Compás & Subdivisiones</label>
+            <div class="grid2" style="margin-top:6px">
+              <div class="hstack"><input id="beatsPerBar" type="number" min="1" max="16"><span class="muted" style="margin-left:auto">Golpes/barra</span></div>
+              <select id="subdivisions">
+                <option value="1">Negras (x1)</option>
+                <option value="2">Corcheas (x2)</option>
+                <option value="3">Tresillos (x3)</option>
+                <option value="4">Semicorcheas (x4)</option>
+              </select>
+            </div>
+            <div class="muted" style="margin-top:4px">El primer golpe del compás se acentúa.</div>
+          </div>
+
+          <div class="group">
+            <label>Volumen</label>
+            <div class="hstack" style="margin-top:6px">
+              <input id="volume" type="range" min="0" max="1" step="0.01">
+              <div class="muted" id="volLabel" style="margin-left:auto">50%</div>
+            </div>
+            <div class="hstack" style="margin-top:6px">
+              <input id="soundOnRest" type="checkbox">
+              <span class="muted">Sonar también en descanso</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card right">
+      <div class="title-row">
+        <h1>Intervalos de práctica</h1>
+      </div>
+      <div class="group">
+        <label>Duración de PRÁCTICA</label>
+        <div class="grid2" style="margin-top:6px">
+          <div class="hstack"><input id="pracMin" type="number" min="0" max="600"><span class="muted" style="margin-left:auto">min</span></div>
+          <div class="hstack"><input id="pracSec" type="number" min="0" max="59"><span class="muted" style="margin-left:auto">seg</span></div>
+        </div>
+      </div>
+      <div class="group">
+        <label>Duración de DESCANSO</label>
+        <div class="grid2" style="margin-top:6px">
+          <div class="hstack"><input id="restMin" type="number" min="0" max="600"><span class="muted" style="margin-left:auto">min</span></div>
+          <div class="hstack"><input id="restSec" type="number" min="0" max="59"><span class="muted" style="margin-left:auto">seg</span></div>
+        </div>
+      </div>
+      <div class="group">
+        <label>Rondas</label>
+        <div class="hstack" style="margin-top:6px">
+          <input id="rounds" type="number" min="1" max="1000">
+          <span class="muted" style="margin-left:auto">PRÁCTICA → DESCANSO = 1 ronda</span>
+        </div>
+      </div>
+      <div class="group">
+        <label>Progresión de tempo (opcional)</label>
+        <div class="grid2" style="margin-top:6px">
+          <div class="hstack"><span class="muted">Δ BPM por ronda</span></div>
+          <input id="deltaBpm" type="number" min="-50" max="50" value="0">
+          <div class="hstack"><span class="muted">BPM máximo</span></div>
+          <input id="maxBpm" type="number" min="60" max="300" value="300">
+        </div>
+        <div class="muted" style="margin-top:6px">El cambio de BPM se aplica al iniciar cada bloque de práctica.</div>
+      </div>
+      <div class="group">
+        <label>Presets rápidos</label>
+        <div class="hstack" style="margin-top:6px">
+          <select id="preset">
+            <option value="">— Elegir preset —</option>
+            <option value="4x60-30@140">4× (60s práctica / 30s descanso) • 140 BPM</option>
+            <option value="8x45-15@130">8× (45/15) • 130 BPM</option>
+            <option value="tabata@160">Tabata 8× (20/10) • 160 BPM</option>
+            <option value="piramide-suave@120">Pirámide suave 4× (45/15) Δ+5 • 120 BPM</option>
+          </select>
+          <button id="presetClear" class="btn gray" style="margin-left:auto">Limpiar</button>
+        </div>
+      </div>
+
+      <div class="footer">Consejo: usa tresillos para swing; semicorcheas para velocidad. Tap para fijar tu tempo natural.</div>
+    </section>
+  </div>
+
+  <!-- Botón instalar PWA (Chrome/Edge/Android) -->
+  <button id="installBtn" class="btn primary">Instalar app</button>
+
+<script>
+(function(){
+  // ---------- Utils ----------
+  const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
+  const toSeconds = (m, s) => (Number.isFinite(+m)?+m:0)*60 + (Number.isFinite(+s)?+s:0);
+  const fmt = (t)=>{
+    t = Math.max(0, Math.floor(t));
+    const mm = String(Math.floor(t/60)).padStart(2,'0');
+    const ss = String(t%60).padStart(2,'0');
+    return mm+':'+ss;
+  };
+  const ls = {
+    getNum:(k,d)=>{ try{const v=localStorage.getItem('met_'+k); return v==null?d:Number(v);}catch{return d} },
+    getBool:(k,d)=>{ try{const v=localStorage.getItem('met_'+k); return v==null?d:v==='true';}catch{return d} },
+    getStr:(k,d)=>{ try{const v=localStorage.getItem('met_'+k); return v==null?d:v;}catch{return d} },
+    set:(k,v)=>{ try{localStorage.setItem('met_'+k, String(v));}catch{} }
+  };
+
+  // ---------- Elements ----------
+  const el = id=>document.getElementById(id);
+  const bpmRange=el('bpmRange'), bpmInput=el('bpmInput');
+  const beatsPerBarInput=el('beatsPerBar'), subdivisionsSel=el('subdivisions');
+  const pracMin=el('pracMin'), pracSec=el('pracSec');
+  const restMin=el('restMin'), restSec=el('restSec');
+  const roundsInput=el('rounds');
+  const deltaBpmInput=el('deltaBpm'), maxBpmInput=el('maxBpm');
+  const volumeRange=el('volume'), soundOnRestChk=el('soundOnRest'), volLabel=el('volLabel');
+  const modeLabel=el('modeLabel'), timerEl=el('timer'), roundInfo=el('roundInfo'), beatInfo=el('beatInfo'), subInfo=el('subInfo');
+  const pulse=el('pulse');
+  const btnStart=el('btnStart'), btnPause=el('btnPause'), btnResume=el('btnResume'), btnStop=el('btnStop'), btnReset=el('btnReset'), btnTap=el('btnTap');
+  const bpmMinus=el('bpmMinus'), bpmPlus=el('bpmPlus');
+  const presetSel=el('preset'), presetClear=el('presetClear');
+  const installBtn = el('installBtn');
+
+  // ---------- State ----------
+  const state = {
+    bpm: ls.getNum('bpm', 100),
+    beatsPerBar: ls.getNum('beatsPerBar', 4),
+    subdivisions: ls.getNum('subdivisions', 1),
+    pracMin: ls.getNum('practiceMin', 1),
+    pracSec: ls.getNum('practiceSec', 0),
+    restMin: ls.getNum('restMin', 0),
+    restSec: ls.getNum('restSec', 30),
+    rounds: ls.getNum('rounds', 5),
+    deltaBpm: ls.getNum('deltaBpm', 0),
+    maxBpm: ls.getNum('maxBpm', 300),
+    volume: clamp(ls.getNum('volume', .5), 0, 1),
+    soundOnRest: ls.getBool('soundOnRest', false),
+    presetId: ls.getStr('presetId',''),
+    // runtime
+    running:false, paused:false, mode:'practice', round:0, timeLeft:0,
+    beatIdx:1, subIdx:1
+  };
+
+  // Audio/Scheduler
+  let audioCtx=null, schedulerId=null, countdownId=null, nextNoteTime=0, scheduling=false;
+  const tapTimes=[];
+
+  // ---------- Init UI ----------
+  function syncUI(){
+    bpmRange.value = state.bpm;
+    bpmInput.value = state.bpm;
+    beatsPerBarInput.value = state.beatsPerBar;
+    subdivisionsSel.value = state.subdivisions;
+    pracMin.value = state.pracMin;
+    pracSec.value = state.pracSec;
+    restMin.value = state.restMin;
+    restSec.value = state.restSec;
+    roundsInput.value = state.rounds;
+    deltaBpmInput.value = state.deltaBpm;
+    maxBpmInput.value = state.maxBpm;
+    volumeRange.value = state.volume;
+    volLabel.textContent = Math.round(state.volume*100)+'%';
+    soundOnRestChk.checked = state.soundOnRest;
+    presetSel.value = state.presetId || '';
+    timerEl.textContent = fmt(state.timeLeft || toSeconds(state.pracMin, state.pracSec));
+    roundInfo.textContent = state.running ? (state.round+'/'+state.rounds) : '-';
+    beatInfo.textContent = state.beatIdx+'/'+state.beatsPerBar;
+    subInfo.textContent = state.subIdx+'/'+state.subdivisions;
+    modeLabel.textContent = (state.mode==='practice') ? 'PRÁCTICA' : 'DESCANSO';
+    modeLabel.className = 'mode ' + (state.mode==='practice'?'practice':'rest');
+    btnStart.disabled = state.running;
+    btnPause.disabled = !state.running || state.paused;
+    btnResume.style.display = (state.running && state.paused) ? '' : 'none';
+  }
+  syncUI();
+
+  // ---------- Persistence ----------
+  const persist = (k,v)=>ls.set(k,v);
+
+  // ---------- Audio helpers ----------
+  function ensureAudio(){
+    if(!audioCtx){
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new Ctx();
+    }
+    if(audioCtx.state==='suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function scheduleVisual(time, kind){
+    if(!audioCtx) return;
+    const ms = Math.max(0, (time - audioCtx.currentTime)*1000);
+    setTimeout(()=>{
+      pulse.classList.toggle('active', false); // reset
+      void pulse.offsetWidth; // reflow hack
+      pulse.classList.add('active');
+      pulse.classList.toggle('accent', (state.subIdx===1 && state.beatIdx===1 && state.mode==='practice'));
+      beatInfo.textContent = state.beatIdx+'/'+state.beatsPerBar;
+      subInfo.textContent = state.subIdx+'/'+state.subdivisions;
+    }, ms);
+  }
+
+  function scheduleClick(time, kind){
+    if(state.mode==='rest' && !state.soundOnRest){
+      scheduleVisual(time, kind);
+      return;
+    }
+    const ctx = audioCtx;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    const freq = (kind==='accent')?1350:(kind==='beat'?1000:750);
+    osc.frequency.setValueAtTime(freq, time);
+    const v = clamp(state.volume, 0, 1);
+    const level = (kind==='accent')? v : (kind==='beat'? v*0.8 : v*0.45);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.001, level), time+0.003);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time+0.04);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(time); osc.stop(time+0.05);
+    scheduleVisual(time, kind);
+  }
+
+  function schedulerTick(){
+    if(scheduling || !audioCtx) return;
+    scheduling = true;
+    const lookahead = 0.1;
+    const subInt = (60 / clamp(state.bpm, 20, 300)) / clamp(state.subdivisions,1,8);
+    while(nextNoteTime < audioCtx.currentTime + lookahead){
+      const onBeat = state.subIdx===1;
+      const isDown = onBeat && state.beatIdx===1;
+      const kind = isDown ? 'accent' : (onBeat ? 'beat' : 'sub');
+      scheduleClick(nextNoteTime, kind);
+
+      state.subIdx += 1;
+      if(state.subIdx > Math.max(1, state.subdivisions)){
+        state.subIdx = 1;
+        state.beatIdx += 1;
+        if(state.beatIdx > Math.max(1, state.beatsPerBar)) state.beatIdx = 1;
+      }
+      nextNoteTime += subInt;
+    }
+    scheduling = false;
+  }
+
+  function startCountdown(){
+    let last = performance.now();
+    countdownId = setInterval(()=>{
+      const now = performance.now();
+      const delta = (now - last)/1000; last = now;
+      state.timeLeft = Math.max(0, (state.timeLeft || 0) - delta);
+      timerEl.textContent = fmt(state.timeLeft);
+      if(state.timeLeft <= 0){
+        if(state.mode==='practice'){
+          state.mode='rest'; modeLabel.textContent='DESCANSO'; modeLabel.className='mode rest';
+          state.timeLeft = toSeconds(state.restMin, state.restSec);
+        } else {
+          state.round += 1;
+          if(state.round > state.rounds){
+            stop();
+            return;
+          }
+          if(state.deltaBpm !== 0){
+            state.bpm = clamp(state.bpm + state.deltaBpm, 20, Math.max(20, state.maxBpm));
+            bpmRange.value = state.bpm; bpmInput.value = state.bpm; persist('bpm', state.bpm);
+          }
+          state.mode='practice'; modeLabel.textContent='PRÁCTICA'; modeLabel.className='mode practice';
+          state.timeLeft = toSeconds(state.pracMin, state.pracSec);
+        }
+        roundInfo.textContent = state.round + '/' + state.rounds;
+      }
+    }, 100);
+  }
+
+  // ---------- Transport ----------
+  function start(){
+    if(state.running) return;
+    ensureAudio();
+    state.running = true; state.paused=false;
+    state.mode = 'practice'; state.round = 1;
+    state.timeLeft = toSeconds(state.pracMin, state.pracSec);
+    state.beatIdx = 1; state.subIdx = 1;
+    roundInfo.textContent = state.round + '/' + state.rounds;
+    modeLabel.textContent='PRÁCTICA'; modeLabel.className='mode practice';
+    nextNoteTime = audioCtx.currentTime + 0.05;
+    schedulerId = setInterval(schedulerTick, 25);
+    startCountdown();
+    btnStart.disabled = true; btnPause.disabled = false; btnResume.style.display='none';
+  }
+
+  function pause(){
+    if(!state.running || state.paused) return;
+    state.paused = true;
+    if(schedulerId) clearInterval(schedulerId);
+    if(countdownId) clearInterval(countdownId);
+    schedulerId = countdownId = null;
+    btnPause.disabled = true;
+    btnResume.style.display='';
+  }
+
+  function resume(){
+    if(!state.running || !state.paused) return;
+    state.paused = false;
+    ensureAudio();
+    nextNoteTime = audioCtx.currentTime + 0.05;
+    schedulerId = setInterval(schedulerTick, 25);
+    startCountdown();
+    btnPause.disabled = false;
+    btnResume.style.display='none';
+  }
+
+  function stop(){
+    if(schedulerId) clearInterval(schedulerId);
+    if(countdownId) clearInterval(countdownId);
+    schedulerId = countdownId = null;
+    state.running=false; state.paused=false;
+    state.mode='practice'; state.round=0; state.timeLeft=0;
+    state.beatIdx=1; state.subIdx=1;
+    syncUI();
+  }
+
+  function reset(){
+    stop();
+    state.bpm=100; state.beatsPerBar=4; state.subdivisions=1;
+    state.pracMin=1; state.pracSec=0; state.restMin=0; state.restSec=30; state.rounds=5;
+    state.deltaBpm=0; state.maxBpm=300; state.volume=.5; state.soundOnRest=false; state.presetId='';
+    persist('bpm',state.bpm); persist('beatsPerBar',state.beatsPerBar); persist('subdivisions',state.subdivisions);
+    persist('practiceMin',state.pracMin); persist('practiceSec',state.pracSec);
+    persist('restMin',state.restMin); persist('restSec',state.restSec);
+    persist('rounds',state.rounds); persist('deltaBpm',state.deltaBpm); persist('maxBpm',state.maxBpm);
+    persist('volume',state.volume); persist('soundOnRest',state.soundOnRest); persist('presetId',state.presetId);
+    syncUI();
+  }
+
+  function applyPreset(id){
+    state.presetId = id; persist('presetId', id || '');
+    if(!id) return syncUI();
+    if(id==='4x60-30@140'){
+      state.pracMin=1; state.pracSec=0; state.restMin=0; state.restSec=30; state.rounds=4; state.bpm=140; state.deltaBpm=0; state.subdivisions=2;
+    } else if(id==='8x45-15@130'){
+      state.pracMin=0; state.pracSec=45; state.restMin=0; state.restSec=15; state.rounds=8; state.bpm=130; state.deltaBpm=0; state.subdivisions=2;
+    } else if(id==='tabata@160'){
+      state.pracMin=0; state.pracSec=20; state.restMin=0; state.restSec=10; state.rounds=8; state.bpm=160; state.deltaBpm=0; state.subdivisions=4;
+    } else if(id==='piramide-suave@120'){
+      state.pracMin=0; state.pracSec=45; state.restMin=0; state.restSec=15; state.rounds=4; state.bpm=120; state.deltaBpm=5; state.subdivisions=2;
+    }
+    persist('practiceMin',state.pracMin); persist('practiceSec',state.pracSec);
+    persist('restMin',state.restMin); persist('restSec',state.restSec);
+    persist('rounds',state.rounds); persist('bpm',state.bpm); persist('deltaBpm',state.deltaBpm); persist('subdivisions',state.subdivisions);
+    syncUI();
+  }
+
+  // ---------- Events ----------
+  bpmRange.addEventListener('input', e=>{ state.bpm = clamp(+e.target.value, 20, 300); bpmInput.value=state.bpm; persist('bpm', state.bpm); });
+  bpmInput.addEventListener('input', e=>{ state.bpm = clamp(+e.target.value, 20, 300); bpmRange.value=state.bpm; persist('bpm', state.bpm); });
+  bpmMinus.addEventListener('click', ()=>{ state.bpm=clamp(state.bpm-1,20,300); bpmRange.value=bpmInput.value=state.bpm; persist('bpm', state.bpm); });
+  bpmPlus.addEventListener('click', ()=>{ state.bpm=clamp(state.bpm+1,20,300); bpmRange.value=bpmInput.value=state.bpm; persist('bpm', state.bpm); });
+
+  beatsPerBarInput.addEventListener('input', e=>{ state.beatsPerBar = clamp(+e.target.value,1,16); persist('beatsPerBar', state.beatsPerBar); syncUI(); });
+  subdivisionsSel.addEventListener('change', e=>{ state.subdivisions = clamp(+e.target.value,1,8); persist('subdivisions', state.subdivisions); syncUI(); });
+
+  volumeRange.addEventListener('input', e=>{ state.volume = clamp(+e.target.value,0,1); volLabel.textContent = Math.round(state.volume*100)+'%'; persist('volume', state.volume); });
+  soundOnRestChk.addEventListener('change', e=>{ state.soundOnRest = !!e.target.checked; persist('soundOnRest', state.soundOnRest); });
+
+  pracMin.addEventListener('input', e=>{ state.pracMin = clamp(+e.target.value,0,600); persist('practiceMin', state.pracMin); syncUI(); });
+  pracSec.addEventListener('input', e=>{ state.pracSec = clamp(+e.target.value,0,59); persist('practiceSec', state.pracSec); syncUI(); });
+  restMin.addEventListener('input', e=>{ state.restMin = clamp(+e.target.value,0,600); persist('restMin', state.restMin); });
+  restSec.addEventListener('input', e=>{ state.restSec = clamp(+e.target.value,0,59); persist('restSec', state.restSec); });
+
+  roundsInput.addEventListener('input', e=>{ state.rounds = clamp(+e.target.value,1,1000); persist('rounds', state.rounds); syncUI(); });
+  deltaBpmInput.addEventListener('input', e=>{ state.deltaBpm = clamp(+e.target.value,-50,50); persist('deltaBpm', state.deltaBpm); });
+  maxBpmInput.addEventListener('input', e=>{ state.maxBpm = clamp(+e.target.value,60,300); persist('maxBpm', state.maxBpm); });
+
+  presetSel.addEventListener('change', e=>applyPreset(e.target.value));
+  presetClear.addEventListener('click', ()=>{ presetSel.value=''; state.presetId=''; persist('presetId',''); });
+
+  btnStart.addEventListener('click', start);
+  btnPause.addEventListener('click', pause);
+  btnResume.addEventListener('click', resume);
+  btnStop.addEventListener('click', stop);
+  btnReset.addEventListener('click', reset);
+
+  // Tap tempo
+  btnTap.addEventListener('click', ()=>{
+    const t = performance.now();
+    const last = tapTimes[tapTimes.length-1];
+    if(last){
+      const interval = t - last;
+      if(interval > 150 && interval < 2000){
+        tapTimes.push(t); if(tapTimes.length>6) tapTimes.shift();
+        const diffs=[]; for(let i=1;i<tapTimes.length;i++) diffs.push(tapTimes[i]-tapTimes[i-1]);
+        const avg = diffs.reduce((a,b)=>a+b,0)/diffs.length;
+        const next = Math.round(60000/avg);
+        state.bpm = clamp(next, 20, 300);
+        bpmRange.value = bpmInput.value = state.bpm; persist('bpm', state.bpm);
+        return;
+      }
+    }
+    tapTimes.length = 0; tapTimes.push(t);
+  });
+
+  // Teclas: Space (inicia/pausa/reanuda), Enter (detiene)
+  window.addEventListener('keydown', (e)=>{
+    if(e.code==='Space'){ e.preventDefault(); if(!state.running) start(); else if(!state.paused) pause(); else resume(); }
+    if(e.code==='Enter'){ e.preventDefault(); stop(); }
+  });
+
+  // ---------- PWA: registrar SW + instalar ----------
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js');
+  }
+  let deferredPrompt;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBtn.style.display = 'block';
+  });
+  installBtn.addEventListener('click', async () => {
+    installBtn.style.display = 'none';
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  });
+  window.addEventListener('appinstalled', () => {
+    installBtn.style.display = 'none';
+  });
+
+  // First paint
+  syncUI();
+})();
+</script>
+</body>
+</html>
