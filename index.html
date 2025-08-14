@@ -13,39 +13,25 @@
 
   <style>
     :root{
-      --bg:#0b1220;
-      --panel:#101a2e;
-      --muted:#9bb0cf;
-      --ring:rgba(255,255,255,.09);
-      --accent:#32d296;
-      --accent2:#38bdf8;
-      --text:#e6eefc;
-      --radius:18px;
-      --pad:18px;
+      --bg:#0b1220; --panel:#101a2e; --muted:#9bb0cf; --ring:rgba(255,255,255,.09);
+      --accent:#32d296; --accent2:#38bdf8; --text:#e6eefc; --radius:18px; --pad:18px;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{
-      margin:0;
-      background:radial-gradient(1200px 600px at 5% -10%, #18305322, transparent 60%), var(--bg);
-      color:var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-      -webkit-font-smoothing:antialiased;
-      -moz-osx-font-smoothing:grayscale;
-      -webkit-tap-highlight-color:transparent;
+      margin:0; background:radial-gradient(1200px 600px at 5% -10%, #18305322, transparent 60%), var(--bg);
+      color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; -webkit-tap-highlight-color:transparent;
     }
     .wrap{
-      max-width:1100px;
-      margin:0 auto;
+      max-width:1100px; margin:0 auto;
       padding:calc(var(--pad) + env(safe-area-inset-top)) calc(var(--pad) + env(safe-area-inset-right)) calc(var(--pad) + env(safe-area-inset-bottom)) calc(var(--pad) + env(safe-area-inset-left));
-      min-height:100vh;
-      display:grid; gap:24px; grid-template-columns:1.8fr 1fr;
+      min-height:100vh; display:grid; gap:24px; grid-template-columns:1.8fr 1fr;
     }
     @media (max-width: 900px){ .wrap{grid-template-columns:1fr} }
     .card{
       background:linear-gradient(180deg, rgba(255,255,255,.03), transparent), var(--panel);
-      border-radius:var(--radius);
-      padding:var(--pad);
+      border-radius:var(--radius); padding:var(--pad);
       box-shadow:0 20px 60px #0006, inset 0 0 0 1px var(--ring);
     }
     h1{font-size:20px;margin:0;letter-spacing:.2px}
@@ -83,8 +69,7 @@
     }
     .pulse::after{
       content:""; position:absolute; inset:0; border-radius:inherit;
-      transform:scale(.88); opacity:.6;
-      transition:transform .08s cubic-bezier(.2,.8,.2,1), opacity .08s linear;
+      transform:scale(.88); opacity:.6; transition:transform .08s cubic-bezier(.2,.8,.2,1), opacity .08s linear;
       box-shadow:0 0 0 3px rgba(255,255,255,.12), 0 0 90px 14px rgba(56,189,248,.12);
     }
     .pulse.accent::after{ box-shadow:0 0 0 3px rgba(255,255,255,.12), 0 0 120px 18px rgba(50,210,150,.22) }
@@ -95,14 +80,24 @@
     .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .footer{font-size:11px;color:#9db4d3;opacity:.9;text-align:center;margin-top:10px}
 
-    /* Botón instalar */
-    #installBtn{
-      position:fixed; right:calc(18px + env(safe-area-inset-right)); bottom:calc(18px + env(safe-area-inset-bottom));
+    /* Botones flotantes */
+    #installBtn, #testSoundBtn{
+      position:fixed; right:calc(18px + env(safe-area-inset-right));
       display:none; z-index:1000; width:auto; min-width:150px;
       box-shadow:0 10px 30px rgba(0,0,0,.35);
     }
+    #installBtn{ bottom:calc(18px + env(safe-area-inset-bottom)); }
+    #testSoundBtn{ bottom:calc(76px + env(safe-area-inset-bottom)); display:block; }
 
-    /* --- Responsive para móviles --- */
+    /* Status */
+    #audioStatus{
+      position:fixed; left:50%; transform:translateX(-50%);
+      bottom:calc(18px + env(safe-area-inset-bottom) + 72px);
+      background:#0d1628; color:#cfe1ff; border:1px solid var(--ring);
+      padding:10px 14px; border-radius:12px; font-size:13px; display:none;
+    }
+
+    /* Responsive móvil */
     @media (max-width: 520px){
       .timer{font-size:clamp(44px, 10vw, 64px)}
       .pulse{width:160px; height:160px}
@@ -248,20 +243,18 @@
     </section>
   </div>
 
-  <!-- Botón instalar PWA (Chrome/Edge/Android) -->
+  <!-- Botones flotantes -->
+  <button id="testSoundBtn" class="btn primary">Probar sonido</button>
   <button id="installBtn" class="btn primary">Instalar app</button>
+  <div id="audioStatus"></div>
 
 <script>
 (function(){
   // ---------- Utils ----------
   const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
   const toSeconds = (m, s) => (Number.isFinite(+m)?+m:0)*60 + (Number.isFinite(+s)?+s:0);
-  const fmt = (t)=>{
-    t = Math.max(0, Math.floor(t));
-    const mm = String(Math.floor(t/60)).padStart(2,'0');
-    const ss = String(t%60).padStart(2,'0');
-    return mm+':'+ss;
-  };
+  const fmt = (t)=>{ t = Math.max(0, Math.floor(t));
+    const mm = String(Math.floor(t/60)).padStart(2,'0'); const ss = String(t%60).padStart(2,'0'); return mm+':'+ss; };
   const ls = {
     getNum:(k,d)=>{ try{const v=localStorage.getItem('met_'+k); return v==null?d:Number(v);}catch{return d} },
     getBool:(k,d)=>{ try{const v=localStorage.getItem('met_'+k); return v==null?d:v==='true';}catch{return d} },
@@ -284,6 +277,8 @@
   const bpmMinus=el('bpmMinus'), bpmPlus=el('bpmPlus');
   const presetSel=el('preset'), presetClear=el('presetClear');
   const installBtn = el('installBtn');
+  const testSoundBtn = el('testSoundBtn');
+  const statusEl = el('audioStatus');
 
   // ---------- State ----------
   const state = {
@@ -297,19 +292,22 @@
     rounds: ls.getNum('rounds', 5),
     deltaBpm: ls.getNum('deltaBpm', 0),
     maxBpm: ls.getNum('maxBpm', 300),
-    volume: clamp(ls.getNum('volume', .6), 0, 1),
+    volume: clamp(ls.getNum('volume', .7), 0, 1),
     soundOnRest: ls.getBool('soundOnRest', false),
     presetId: ls.getStr('presetId',''),
-    // runtime
-    running:false, paused:false, mode:'practice', round:0, timeLeft:0,
-    beatIdx:1, subIdx:1
+    running:false, paused:false, mode:'practice', round:0, timeLeft:0, beatIdx:1, subIdx:1
   };
 
-  // --- Audio (compartido) ---
+  // --- Audio ---
   let audioCtx=null, schedulerId=null, countdownId=null, nextNoteTime=0, scheduling=false;
   const tapTimes=[];
 
-  // --- iOS: desbloqueo SIN async/await (todo en el mismo click) ---
+  function showStatus(msg, ms=2000){
+    statusEl.textContent = msg; statusEl.style.display='block';
+    clearTimeout(showStatus.t); showStatus.t = setTimeout(()=>statusEl.style.display='none', ms);
+  }
+
+  // --- iOS unlock: beep en la MISMA pulsación y con leve offset ---
   function iosUnlockThen(next){
     if(!audioCtx){
       const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -317,54 +315,44 @@
     }
     try { audioCtx.resume(); } catch {}
     try {
-      // Beep cortito inmediato en el MISMO handler del click
+      const t = audioCtx.currentTime + 0.05; // pequeño offset ayuda en iOS
       const o = audioCtx.createOscillator();
       const g = audioCtx.createGain();
-      o.type = 'sine';
-      o.frequency.value = 880;
-      g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-      g.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 0.02);
-      g.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 0.18);
+      o.type = 'sine'; o.frequency.setValueAtTime(880, t);
+      g.gain.setValueAtTime(0.0001, t - 0.02);
+      g.gain.linearRampToValueAtTime(0.18, t + 0.03);
+      g.gain.linearRampToValueAtTime(0.0001, t + 0.18);
       o.connect(g).connect(audioCtx.destination);
-      o.start();
-      o.stop(audioCtx.currentTime + 0.2);
-    } catch(e) {}
-    next();
+      o.start(t); o.stop(t + 0.2);
+      showStatus('Beep de prueba enviado. Sube el volumen / quita silencio si no lo oyes.', 3000);
+    } catch(e) { showStatus('No se pudo reproducir beep de prueba'); }
+    if(typeof next === 'function') next();
   }
 
   // ---------- Init UI ----------
   function syncUI(){
-    bpmRange.value = state.bpm;
-    bpmInput.value = state.bpm;
-    beatsPerBarInput.value = state.beatsPerBar;
-    subdivisionsSel.value = state.subdivisions;
-    pracMin.value = state.pracMin;
-    pracSec.value = state.pracSec;
-    restMin.value = state.restMin;
-    restSec.value = state.restSec;
-    roundsInput.value = state.rounds;
-    deltaBpmInput.value = state.deltaBpm;
-    maxBpmInput.value = state.maxBpm;
-    volumeRange.value = state.volume;
-    volLabel.textContent = Math.round(state.volume*100)+'%';
-    soundOnRestChk.checked = state.soundOnRest;
-    presetSel.value = state.presetId || '';
+    // si el volumen estaba en 0 por sesiones previas, súbelo un poco
+    if(state.volume < 0.02){ state.volume = 0.6; ls.set('volume', state.volume); }
+    bpmRange.value = state.bpm; bpmInput.value = state.bpm;
+    beatsPerBarInput.value = state.beatsPerBar; subdivisionsSel.value = state.subdivisions;
+    pracMin.value = state.pracMin; pracSec.value = state.pracSec;
+    restMin.value = state.restMin; restSec.value = state.restSec;
+    roundsInput.value = state.rounds; deltaBpmInput.value = state.deltaBpm; maxBpmInput.value = state.maxBpm;
+    volumeRange.value = state.volume; volLabel.textContent = Math.round(state.volume*100)+'%';
+    soundOnRestChk.checked = state.soundOnRest; presetSel.value = state.presetId || '';
     timerEl.textContent = fmt(state.timeLeft || toSeconds(state.pracMin, state.pracSec));
     roundInfo.textContent = state.running ? (state.round+'/'+state.rounds) : '-';
     beatInfo.textContent = state.beatIdx+'/'+state.beatsPerBar;
     subInfo.textContent = state.subIdx+'/'+state.subdivisions;
     modeLabel.textContent = (state.mode==='practice') ? 'PRÁCTICA' : 'DESCANSO';
     modeLabel.className = 'mode ' + (state.mode==='practice'?'practice':'rest');
-    btnStart.disabled = state.running;
-    btnPause.disabled = !state.running || state.paused;
+    btnStart.disabled = state.running; btnPause.disabled = !state.running || state.paused;
     btnResume.style.display = (state.running && state.paused) ? '' : 'none';
   }
   syncUI();
 
-  // ---------- Persistence ----------
   const persist = (k,v)=>ls.set(k,v);
 
-  // ---------- Audio helpers ----------
   function ensureAudio(){
     if(!audioCtx){
       const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -378,9 +366,7 @@
     if(!audioCtx) return;
     const ms = Math.max(0, (time - audioCtx.currentTime)*1000);
     setTimeout(()=>{
-      pulse.classList.toggle('active', false);
-      void pulse.offsetWidth;
-      pulse.classList.add('active');
+      pulse.classList.toggle('active', false); void pulse.offsetWidth; pulse.classList.add('active');
       pulse.classList.toggle('accent', (state.subIdx===1 && state.beatIdx===1 && state.mode==='practice'));
       beatInfo.textContent = state.beatIdx+'/'+state.beatsPerBar;
       subInfo.textContent = state.subIdx+'/'+state.subdivisions;
@@ -388,23 +374,19 @@
   }
 
   function scheduleClick(time, kind){
-    if(state.mode==='rest' && !state.soundOnRest){
-      scheduleVisual(time);
-      return;
-    }
+    if(state.mode==='rest' && !state.soundOnRest){ scheduleVisual(time); return; }
     const ctx = audioCtx;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
     osc.type = 'square';
     const freq = (kind==='accent')?1350:(kind==='beat'?1000:750);
     osc.frequency.setValueAtTime(freq, time);
     const v = clamp(state.volume, 0, 1);
     const level = (kind==='accent')? v : (kind==='beat'? v*0.8 : v*0.45);
-    gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.001, level), time+0.003);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time+0.04);
+    gain.gain.setValueAtTime(0.0001, time - 0.02);
+    gain.gain.linearRampToValueAtTime(Math.max(0.001, level), time + 0.01);
+    gain.gain.linearRampToValueAtTime(0.0001, time + 0.05);
     osc.connect(gain).connect(ctx.destination);
-    osc.start(time); osc.stop(time+0.05);
+    osc.start(time); osc.stop(time + 0.06);
     scheduleVisual(time);
   }
 
@@ -421,8 +403,7 @@
 
       state.subIdx += 1;
       if(state.subIdx > Math.max(1, state.subdivisions)){
-        state.subIdx = 1;
-        state.beatIdx += 1;
+        state.subIdx = 1; state.beatIdx += 1;
         if(state.beatIdx > Math.max(1, state.beatsPerBar)) state.beatIdx = 1;
       }
       nextNoteTime += subInt;
@@ -443,10 +424,7 @@
           state.timeLeft = toSeconds(state.restMin, state.restSec);
         } else {
           state.round += 1;
-          if(state.round > state.rounds){
-            stop();
-            return;
-          }
+          if(state.round > state.rounds){ stop(); return; }
           if(state.deltaBpm !== 0){
             state.bpm = clamp(state.bpm + state.deltaBpm, 20, Math.max(20, state.maxBpm));
             bpmRange.value = state.bpm; bpmInput.value = state.bpm; persist('bpm', state.bpm);
@@ -510,7 +488,7 @@
     stop();
     state.bpm=100; state.beatsPerBar=4; state.subdivisions=1;
     state.pracMin=1; state.pracSec=0; state.restMin=0; state.restSec=30; state.rounds=5;
-    state.deltaBpm=0; state.maxBpm=300; state.volume=.6; state.soundOnRest=false; state.presetId='';
+    state.deltaBpm=0; state.maxBpm=300; state.volume=.7; state.soundOnRest=false; state.presetId='';
     persist('bpm',state.bpm); persist('beatsPerBar',state.beatsPerBar); persist('subdivisions',state.subdivisions);
     persist('practiceMin',state.pracMin); persist('practiceSec',state.pracSec);
     persist('restMin',state.restMin); persist('restSec',state.restSec);
@@ -569,13 +547,12 @@
 
   // Tap tempo
   btnTap.addEventListener('click', ()=>{
-    const t = performance.now();
-    const last = tapTimes[tapTimes.length-1];
+    const t = performance.now(); const last = tapTimes[tapTimes.length-1];
     if(last){
       const interval = t - last;
       if(interval > 150 && interval < 2000){
         tapTimes.push(t); if(tapTimes.length>6) tapTimes.shift();
-        const diffs=[]; for(let i=1;i<tapTimes.length;i++) diffs.push(tapTimes[i]-tapTimes[i-1]);
+        const diffs=[]; for(let i=1;i<tapTimes.length;i++) diffs.push(tapTimes[i]-t apTimes[i-1]);
         const avg = diffs.reduce((a,b)=>a+b,0)/diffs.length;
         const next = Math.round(60000/avg);
         state.bpm = clamp(next, 20, 300);
@@ -586,25 +563,15 @@
     tapTimes.length = 0; tapTimes.push(t);
   });
 
+  // Botón de prueba de sonido visible siempre
+  testSoundBtn.addEventListener('click', () => iosUnlockThen(()=>showStatus('Si no oyes nada: sube volumen, desactiva el modo silencio y desconecta BT/AirPlay.', 4000)));
+
   // ---------- PWA: registrar SW + instalar ----------
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js');
-  }
+  if ('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js'); }
   let deferredPrompt;
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    installBtn.style.display = 'block';
-  });
-  installBtn.addEventListener('click', () => {
-    installBtn.style.display = 'none';
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    deferredPrompt = null;
-  });
-  window.addEventListener('appinstalled', () => {
-    installBtn.style.display = 'none';
-  });
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'block'; });
+  installBtn.addEventListener('click', () => { installBtn.style.display = 'none'; if (!deferredPrompt) return; deferredPrompt.prompt(); deferredPrompt = null; });
+  window.addEventListener('appinstalled', () => { installBtn.style.display = 'none'; });
 
   // First paint
   syncUI();
