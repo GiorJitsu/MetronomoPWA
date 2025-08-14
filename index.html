@@ -8,7 +8,7 @@
   <!-- PWA -->
   <meta name="theme-color" content="#0b1220" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <!-- (opcional) icono iOS: <link rel="apple-touch-icon" href="icons/icon-192.png"> -->
+  <!-- (opcional iOS) <link rel="apple-touch-icon" href="icons/icon-192.png"> -->
   <link rel="manifest" href="manifest.webmanifest" />
 
   <style>
@@ -33,6 +33,11 @@
       background:linear-gradient(180deg, rgba(255,255,255,.03), transparent), var(--panel);
       border-radius:var(--radius); padding:var(--pad);
       box-shadow:0 20px 60px #0006, inset 0 0 0 1px var(--ring);
+    }
+    .brand-logo{
+      display:block; margin:0 auto 10px auto; height:auto;
+      width:min(80%, 420px); max-width:100%;
+      image-rendering:-webkit-optimize-contrast;
     }
     h1{font-size:20px;margin:0;letter-spacing:.2px}
     .muted{color:var(--muted);font-size:12px}
@@ -113,6 +118,10 @@
 <body>
   <div class="wrap">
     <section class="card left">
+      <!-- Logo al principio -->
+      <img class="brand-logo" alt="BanditCorp logo"
+           src="./assets/img/Logo-bandit-corp.png" />
+
       <div class="title-row">
         <h1>Metrónomo de práctica</h1>
         <div class="muted">WebAudio • PWA</div>
@@ -300,17 +309,21 @@
   };
 
   // --- Audio ---
-  let audioCtx=null, schedulerId=null, countdownId=null, nextNoteTime=0, scheduling=false;
+  let audioCtx=null, schedulerId=null, countdownId=null, preTimerId=null, nextNoteTime=0, scheduling=false;
   const tapTimes=[];
 
   function showStatus(msg, ms=2000){
     statusEl.textContent = msg; statusEl.style.display='block';
     clearTimeout(showStatus.t); showStatus.t = setTimeout(()=>statusEl.style.display='none', ms);
   }
-  // Muestra errores JS en pantalla para depurar rápido en iPhone
   window.addEventListener('error', (e)=> showStatus('⚠️ Error: '+e.message, 5000));
 
-  // --- iOS unlock: beep en la MISMA pulsación y con leve offset ---
+  // Mantener la pantalla encendida (Wake Lock compatible)
+  let wakeLock;
+  async function enableWakeLock(){ try{ wakeLock = await navigator.wakeLock.request('screen'); }catch{} }
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && wakeLock?.released) enableWakeLock(); });
+
+  // --- iOS unlock: beep en MISMA pulsación con leve offset ---
   function iosUnlockThen(next){
     if(!audioCtx){
       const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -318,21 +331,18 @@
     }
     try { audioCtx.resume(); } catch {}
     try {
-      const t = audioCtx.currentTime + 0.05; // pequeño offset ayuda en iOS
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = 'sine'; o.frequency.setValueAtTime(880, t);
-      g.gain.setValueAtTime(0.0001, t - 0.02);
-      g.gain.linearRampToValueAtTime(0.18, t + 0.03);
-      g.gain.linearRampToValueAtTime(0.0001, t + 0.18);
-      o.connect(g).connect(audioCtx.destination);
-      o.start(t); o.stop(t + 0.2);
-      showStatus('Beep de prueba enviado. Sube el volumen / quita silencio si no lo oyes.', 3000);
+      const t = audioCtx.currentTime + 0.05;
+      const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+      o.type='sine'; o.frequency.setValueAtTime(880, t);
+      g.gain.setValueAtTime(0.0001, t-0.02);
+      g.gain.linearRampToValueAtTime(0.18, t+0.03);
+      g.gain.linearRampToValueAtTime(0.0001, t+0.18);
+      o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t+0.2);
+      showStatus('Beep de prueba enviado. Sube volumen / quita silencio si no lo oyes.', 3000);
     } catch(e) { showStatus('No se pudo reproducir beep de prueba'); }
-    if(typeof next === 'function') next();
+    if(typeof next==='function') next();
   }
 
-  // ---------- Init UI ----------
   function syncUI(){
     if(state.volume < 0.02){ state.volume = 0.6; ls.set('volume', state.volume); }
     bpmRange.value = state.bpm; bpmInput.value = state.bpm;
@@ -443,15 +453,30 @@
   function start(){
     if(state.running) return;
     ensureAudio();
+    enableWakeLock?.();
+
     state.running = true; state.paused=false;
     state.mode = 'practice'; state.round = 1;
     state.timeLeft = toSeconds(state.pracMin, state.pracSec);
     state.beatIdx = 1; state.subIdx = 1;
     roundInfo.textContent = state.round + '/' + state.rounds;
     modeLabel.textContent='PRÁCTICA'; modeLabel.className='mode practice';
-    nextNoteTime = audioCtx.currentTime + 0.05;
+
+    // Pre-roll: 1 compás de conteo
+    const beatDur = 60 / clamp(state.bpm, 20, 300);
+    const preBeats = Math.max(1, state.beatsPerBar);
+    let t = audioCtx.currentTime + 0.12;
+    for(let i=1;i<=preBeats;i++){
+      const kind = (i===1 ? 'accent' : 'beat');
+      scheduleClick(t, kind);
+      t += beatDur;
+    }
+    nextNoteTime = t;
     schedulerId = setInterval(schedulerTick, 25);
-    startCountdown();
+
+    if(preTimerId) clearTimeout(preTimerId);
+    preTimerId = setTimeout(()=>{ startCountdown(); }, Math.max(0, (nextNoteTime - audioCtx.currentTime)*1000));
+
     btnStart.disabled = true; btnPause.disabled = false; btnResume.style.display='none';
   }
 
@@ -460,7 +485,8 @@
     state.paused = true;
     if(schedulerId) clearInterval(schedulerId);
     if(countdownId) clearInterval(countdownId);
-    schedulerId = countdownId = null;
+    if(preTimerId) clearTimeout(preTimerId);
+    schedulerId = countdownId = preTimerId = null;
     btnPause.disabled = true;
     btnResume.style.display='';
   }
@@ -468,6 +494,7 @@
   function resume(){
     if(!state.running || !state.paused) return;
     ensureAudio();
+    enableWakeLock?.();
     state.paused = false;
     nextNoteTime = audioCtx.currentTime + 0.05;
     schedulerId = setInterval(schedulerTick, 25);
@@ -479,7 +506,8 @@
   function stop(){
     if(schedulerId) clearInterval(schedulerId);
     if(countdownId) clearInterval(countdownId);
-    schedulerId = countdownId = null;
+    if(preTimerId) clearTimeout(preTimerId);
+    schedulerId = countdownId = preTimerId = null;
     state.running=false; state.paused=false;
     state.mode='practice'; state.round=0; state.timeLeft=0;
     state.beatIdx=1; state.subIdx=1;
@@ -547,14 +575,14 @@
   btnStop.addEventListener('click', stop);
   btnReset.addEventListener('click', reset);
 
-  // Tap tempo (FIX del typo aquí)
+  // Tap tempo
   btnTap.addEventListener('click', ()=>{
     const t = performance.now(); const last = tapTimes[tapTimes.length-1];
     if(last){
       const interval = t - last;
       if(interval > 150 && interval < 2000){
         tapTimes.push(t); if(tapTimes.length>6) tapTimes.shift();
-        const diffs=[]; for(let i=1;i<tapTimes.length;i++) diffs.push(tapTimes[i]-tapTimes[i-1]); /* <- corregido */
+        const diffs=[]; for(let i=1;i<tapTimes.length;i++) diffs.push(tapTimes[i]-tapTimes[i-1]);
         const avg = diffs.reduce((a,b)=>a+b,0)/diffs.length;
         const next = Math.round(60000/avg);
         state.bpm = clamp(next, 20, 300);
@@ -575,7 +603,6 @@
   installBtn.addEventListener('click', () => { installBtn.style.display = 'none'; if (!deferredPrompt) return; deferredPrompt.prompt(); deferredPrompt = null; });
   window.addEventListener('appinstalled', () => { installBtn.style.display = 'none'; });
 
-  // First paint
   syncUI();
 })();
 </script>
