@@ -95,6 +95,7 @@
       bottom:calc(18px + env(safe-area-inset-bottom) + 72px);
       background:#0d1628; color:#cfe1ff; border:1px solid var(--ring);
       padding:10px 14px; border-radius:12px; font-size:13px; display:none;
+      max-width:92vw; text-align:center;
     }
 
     /* Responsive móvil */
@@ -306,6 +307,8 @@
     statusEl.textContent = msg; statusEl.style.display='block';
     clearTimeout(showStatus.t); showStatus.t = setTimeout(()=>statusEl.style.display='none', ms);
   }
+  // Muestra errores JS en pantalla para depurar rápido en iPhone
+  window.addEventListener('error', (e)=> showStatus('⚠️ Error: '+e.message, 5000));
 
   // --- iOS unlock: beep en la MISMA pulsación y con leve offset ---
   function iosUnlockThen(next){
@@ -331,7 +334,6 @@
 
   // ---------- Init UI ----------
   function syncUI(){
-    // si el volumen estaba en 0 por sesiones previas, súbelo un poco
     if(state.volume < 0.02){ state.volume = 0.6; ls.set('volume', state.volume); }
     bpmRange.value = state.bpm; bpmInput.value = state.bpm;
     beatsPerBarInput.value = state.beatsPerBar; subdivisionsSel.value = state.subdivisions;
@@ -545,14 +547,14 @@
   btnStop.addEventListener('click', stop);
   btnReset.addEventListener('click', reset);
 
-  // Tap tempo
+  // Tap tempo (FIX del typo aquí)
   btnTap.addEventListener('click', ()=>{
     const t = performance.now(); const last = tapTimes[tapTimes.length-1];
     if(last){
       const interval = t - last;
       if(interval > 150 && interval < 2000){
         tapTimes.push(t); if(tapTimes.length>6) tapTimes.shift();
-        const diffs=[]; for(let i=1;i<tapTimes.length;i++) diffs.push(tapTimes[i]-t apTimes[i-1]);
+        const diffs=[]; for(let i=1;i<tapTimes.length;i++) diffs.push(tapTimes[i]-tapTimes[i-1]); /* <- corregido */
         const avg = diffs.reduce((a,b)=>a+b,0)/diffs.length;
         const next = Math.round(60000/avg);
         state.bpm = clamp(next, 20, 300);
