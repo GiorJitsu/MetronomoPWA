@@ -82,7 +82,7 @@
     .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .footer{font-size:11px;color:#9db4d3;opacity:.9;text-align:center;margin-top:10px}
 
-    /* Botón de instalar (aparece si el navegador lo permite) */
+    /* Botón instalar */
     #installBtn{
       position:fixed; right:18px; bottom:18px;
       display:none; z-index:1000;
@@ -285,6 +285,28 @@
   let audioCtx=null, schedulerId=null, countdownId=null, nextNoteTime=0, scheduling=false;
   const tapTimes=[];
 
+  // ---------- iOS: desbloquear audio ----------
+  async function unlockAudioCtx() {
+    // crea/reanuda el contexto y dispara un buffer vacío (hack iOS)
+    if (!audioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new Ctx();
+    }
+    try { await audioCtx.resume(); } catch {}
+    try {
+      const buffer = audioCtx.createBuffer(1, 1, 22050);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(audioCtx.destination);
+      src.start(0);
+    } catch {}
+  }
+  ['touchstart','mousedown','keydown'].forEach(ev => {
+    window.addEventListener(ev, () => {
+      if (audioCtx && audioCtx.state !== 'running') audioCtx.resume();
+    }, { once:true, passive:true });
+  });
+
   // ---------- Init UI ----------
   function syncUI(){
     bpmRange.value = state.bpm;
@@ -416,6 +438,20 @@
   function start(){
     if(state.running) return;
     ensureAudio();
+
+    // Beep corto de confirmación (garantiza que se oye algo en iOS)
+    (function testBeep(){
+      const t = audioCtx.currentTime + 0.02;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(880, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.2, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(t); o.stop(t + 0.16);
+    })();
+
     state.running = true; state.paused=false;
     state.mode = 'practice'; state.round = 1;
     state.timeLeft = toSeconds(state.pracMin, state.pracSec);
@@ -440,8 +476,8 @@
 
   function resume(){
     if(!state.running || !state.paused) return;
-    state.paused = false;
     ensureAudio();
+    state.paused = false;
     nextNoteTime = audioCtx.currentTime + 0.05;
     schedulerId = setInterval(schedulerTick, 25);
     startCountdown();
@@ -514,9 +550,9 @@
   presetSel.addEventListener('change', e=>applyPreset(e.target.value));
   presetClear.addEventListener('click', ()=>{ presetSel.value=''; state.presetId=''; persist('presetId',''); });
 
-  btnStart.addEventListener('click', start);
+  btnStart.addEventListener('click', async () => { await unlockAudioCtx(); start(); });
   btnPause.addEventListener('click', pause);
-  btnResume.addEventListener('click', resume);
+  btnResume.addEventListener('click', async () => { await unlockAudioCtx(); resume(); });
   btnStop.addEventListener('click', stop);
   btnReset.addEventListener('click', reset);
 
@@ -537,12 +573,6 @@
       }
     }
     tapTimes.length = 0; tapTimes.push(t);
-  });
-
-  // Teclas: Space (inicia/pausa/reanuda), Enter (detiene)
-  window.addEventListener('keydown', (e)=>{
-    if(e.code==='Space'){ e.preventDefault(); if(!state.running) start(); else if(!state.paused) pause(); else resume(); }
-    if(e.code==='Enter'){ e.preventDefault(); stop(); }
   });
 
   // ---------- PWA: registrar SW + instalar ----------
