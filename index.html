@@ -5,34 +5,47 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Metrónomo de práctica — PWA</title>
 
-  <!-- PWA basics -->
+  <!-- PWA -->
   <meta name="theme-color" content="#0b1220" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <!-- (opcional) icono iOS: <link rel="apple-touch-icon" href="icons/icon-192.png"> -->
   <link rel="manifest" href="manifest.webmanifest" />
 
   <style>
     :root{
       --bg:#0b1220;
       --panel:#101a2e;
-      --muted:#8aa0c2;
+      --muted:#9bb0cf;
       --ring:rgba(255,255,255,.09);
       --accent:#32d296;
       --accent2:#38bdf8;
       --text:#e6eefc;
+      --radius:18px;
+      --pad:18px;
     }
     *{box-sizing:border-box}
+    html,body{height:100%}
     body{
       margin:0;
       background:radial-gradient(1200px 600px at 5% -10%, #18305322, transparent 60%), var(--bg);
       color:var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans";
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      -webkit-tap-highlight-color:transparent;
     }
-    .wrap{max-width:1100px;margin:0 auto;padding:24px;min-height:100vh;display:grid;gap:24px;grid-template-columns:1.8fr 1fr}
+    .wrap{
+      max-width:1100px;
+      margin:0 auto;
+      padding:calc(var(--pad) + env(safe-area-inset-top)) calc(var(--pad) + env(safe-area-inset-right)) calc(var(--pad) + env(safe-area-inset-bottom)) calc(var(--pad) + env(safe-area-inset-left));
+      min-height:100vh;
+      display:grid; gap:24px; grid-template-columns:1.8fr 1fr;
+    }
     @media (max-width: 900px){ .wrap{grid-template-columns:1fr} }
     .card{
       background:linear-gradient(180deg, rgba(255,255,255,.03), transparent), var(--panel);
-      border-radius:18px;
-      padding:18px;
+      border-radius:var(--radius);
+      padding:var(--pad);
       box-shadow:0 20px 60px #0006, inset 0 0 0 1px var(--ring);
     }
     h1{font-size:20px;margin:0;letter-spacing:.2px}
@@ -42,17 +55,17 @@
     .group{padding:12px;border-radius:12px;background:#0d1628;box-shadow:inset 0 0 0 1px var(--ring)}
     label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
     input[type=number], select{
-      width:100%;padding:8px 10px;border-radius:10px;background:#0b1426;border:1px solid var(--ring);color:var(--text);
-      font-size:14px; text-align:right;
+      width:100%;padding:12px;border-radius:12px;background:#0b1426;border:1px solid var(--ring);color:var(--text);
+      font-size:16px; text-align:right; min-height:44px;
     }
     input[type=range]{width:100%}
-    .hstack{display:flex;gap:8px;align-items:center}
+    .hstack{display:flex;gap:10px;align-items:center}
     .hstack.end{justify-content:flex-end}
     .btn{
       appearance:none;border:0;background:#0b1426;border:1px solid var(--ring);color:var(--text);
-      padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:600;
+      padding:14px 16px;border-radius:14px;cursor:pointer;font-weight:700;min-height:48px;width:100%;
     }
-    .btn:hover{filter:brightness(1.1)}
+    .btn:hover{filter:brightness(1.06)}
     .btn.primary{background:var(--accent);color:#053224;border-color:transparent}
     .btn.warn{background:#fbbf24;color:#2b1b00;border-color:transparent}
     .btn.gray{background:#0d1628}
@@ -64,7 +77,7 @@
     .timer{font-size:56px;font-weight:900;text-align:center;margin-top:6px}
     .mini{font-size:12px;color:var(--muted);text-align:center}
     .pulse{
-      width:180px;height:180px;border-radius:999px;margin:16px auto;
+      width:200px;height:200px;border-radius:999px;margin:16px auto;
       position:relative;background:radial-gradient(circle at 50% 50%, rgba(255,255,255,.12), transparent 60%);
       box-shadow:inset 0 0 0 2px rgba(255,255,255,.08);
     }
@@ -72,9 +85,9 @@
       content:""; position:absolute; inset:0; border-radius:inherit;
       transform:scale(.88); opacity:.6;
       transition:transform .08s cubic-bezier(.2,.8,.2,1), opacity .08s linear;
-      box-shadow:0 0 0 3px rgba(255,255,255,.09), 0 0 80px 10px rgba(56,189,248,.08);
+      box-shadow:0 0 0 3px rgba(255,255,255,.12), 0 0 90px 14px rgba(56,189,248,.12);
     }
-    .pulse.accent::after{ box-shadow:0 0 0 3px rgba(255,255,255,.12), 0 0 100px 16px rgba(50,210,150,.25) }
+    .pulse.accent::after{ box-shadow:0 0 0 3px rgba(255,255,255,.12), 0 0 120px 18px rgba(50,210,150,.22) }
     .pulse.active::after{ transform:scale(1.05); opacity:1 }
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
     .right .group{margin-bottom:10px}
@@ -84,9 +97,20 @@
 
     /* Botón instalar */
     #installBtn{
-      position:fixed; right:18px; bottom:18px;
-      display:none; z-index:1000;
+      position:fixed; right:calc(18px + env(safe-area-inset-right)); bottom:calc(18px + env(safe-area-inset-bottom));
+      display:none; z-index:1000; width:auto; min-width:150px;
       box-shadow:0 10px 30px rgba(0,0,0,.35);
+    }
+
+    /* --- Responsive para móviles --- */
+    @media (max-width: 520px){
+      .timer{font-size:clamp(44px, 10vw, 64px)}
+      .pulse{width:160px; height:160px}
+      .row{grid-template-columns:1fr}
+      .grid2{grid-template-columns:1fr}
+      .title-row h1{font-size:18px}
+      input[type=number], select{font-size:16px}
+      .btn{min-height:50px}
     }
   </style>
 </head>
@@ -134,7 +158,7 @@
             <label>BPM</label>
             <div class="hstack" style="gap:10px;margin-top:6px">
               <input id="bpmRange" type="range" min="20" max="300" step="1">
-              <input id="bpmInput" type="number" min="20" max="300">
+              <input id="bpmInput" type="number" min="20" max="300" inputmode="numeric">
             </div>
             <div class="hstack" style="margin-top:6px">
               <button class="btn gray" id="bpmMinus">–</button>
@@ -145,7 +169,7 @@
           <div class="group">
             <label>Compás & Subdivisiones</label>
             <div class="grid2" style="margin-top:6px">
-              <div class="hstack"><input id="beatsPerBar" type="number" min="1" max="16"><span class="muted" style="margin-left:auto">Golpes/barra</span></div>
+              <div class="hstack"><input id="beatsPerBar" type="number" min="1" max="16" inputmode="numeric"><span class="muted" style="margin-left:auto">Golpes/barra</span></div>
               <select id="subdivisions">
                 <option value="1">Negras (x1)</option>
                 <option value="2">Corcheas (x2)</option>
@@ -178,21 +202,21 @@
       <div class="group">
         <label>Duración de PRÁCTICA</label>
         <div class="grid2" style="margin-top:6px">
-          <div class="hstack"><input id="pracMin" type="number" min="0" max="600"><span class="muted" style="margin-left:auto">min</span></div>
-          <div class="hstack"><input id="pracSec" type="number" min="0" max="59"><span class="muted" style="margin-left:auto">seg</span></div>
+          <div class="hstack"><input id="pracMin" type="number" min="0" max="600" inputmode="numeric"><span class="muted" style="margin-left:auto">min</span></div>
+          <div class="hstack"><input id="pracSec" type="number" min="0" max="59" inputmode="numeric"><span class="muted" style="margin-left:auto">seg</span></div>
         </div>
       </div>
       <div class="group">
         <label>Duración de DESCANSO</label>
         <div class="grid2" style="margin-top:6px">
-          <div class="hstack"><input id="restMin" type="number" min="0" max="600"><span class="muted" style="margin-left:auto">min</span></div>
-          <div class="hstack"><input id="restSec" type="number" min="0" max="59"><span class="muted" style="margin-left:auto">seg</span></div>
+          <div class="hstack"><input id="restMin" type="number" min="0" max="600" inputmode="numeric"><span class="muted" style="margin-left:auto">min</span></div>
+          <div class="hstack"><input id="restSec" type="number" min="0" max="59" inputmode="numeric"><span class="muted" style="margin-left:auto">seg</span></div>
         </div>
       </div>
       <div class="group">
         <label>Rondas</label>
         <div class="hstack" style="margin-top:6px">
-          <input id="rounds" type="number" min="1" max="1000">
+          <input id="rounds" type="number" min="1" max="1000" inputmode="numeric">
           <span class="muted" style="margin-left:auto">PRÁCTICA → DESCANSO = 1 ronda</span>
         </div>
       </div>
@@ -200,9 +224,9 @@
         <label>Progresión de tempo (opcional)</label>
         <div class="grid2" style="margin-top:6px">
           <div class="hstack"><span class="muted">Δ BPM por ronda</span></div>
-          <input id="deltaBpm" type="number" min="-50" max="50" value="0">
+          <input id="deltaBpm" type="number" min="-50" max="50" value="0" inputmode="numeric">
           <div class="hstack"><span class="muted">BPM máximo</span></div>
-          <input id="maxBpm" type="number" min="60" max="300" value="300">
+          <input id="maxBpm" type="number" min="60" max="300" value="300" inputmode="numeric">
         </div>
         <div class="muted" style="margin-top:6px">El cambio de BPM se aplica al iniciar cada bloque de práctica.</div>
       </div>
@@ -273,7 +297,7 @@
     rounds: ls.getNum('rounds', 5),
     deltaBpm: ls.getNum('deltaBpm', 0),
     maxBpm: ls.getNum('maxBpm', 300),
-    volume: clamp(ls.getNum('volume', .5), 0, 1),
+    volume: clamp(ls.getNum('volume', .6), 0, 1),
     soundOnRest: ls.getBool('soundOnRest', false),
     presetId: ls.getStr('presetId',''),
     // runtime
@@ -281,31 +305,32 @@
     beatIdx:1, subIdx:1
   };
 
-  // Audio/Scheduler
+  // --- Audio (compartido) ---
   let audioCtx=null, schedulerId=null, countdownId=null, nextNoteTime=0, scheduling=false;
   const tapTimes=[];
 
-  // ---------- iOS: desbloquear audio ----------
-  async function unlockAudioCtx() {
-    // crea/reanuda el contexto y dispara un buffer vacío (hack iOS)
-    if (!audioCtx) {
+  // --- iOS: desbloqueo SIN async/await (todo en el mismo click) ---
+  function iosUnlockThen(next){
+    if(!audioCtx){
       const Ctx = window.AudioContext || window.webkitAudioContext;
-      audioCtx = new Ctx();
+      try { audioCtx = new Ctx({ latencyHint: 'interactive' }); } catch { audioCtx = new Ctx(); }
     }
-    try { await audioCtx.resume(); } catch {}
+    try { audioCtx.resume(); } catch {}
     try {
-      const buffer = audioCtx.createBuffer(1, 1, 22050);
-      const src = audioCtx.createBufferSource();
-      src.buffer = buffer;
-      src.connect(audioCtx.destination);
-      src.start(0);
-    } catch {}
+      // Beep cortito inmediato en el MISMO handler del click
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.value = 880;
+      g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      g.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 0.02);
+      g.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 0.18);
+      o.connect(g).connect(audioCtx.destination);
+      o.start();
+      o.stop(audioCtx.currentTime + 0.2);
+    } catch(e) {}
+    next();
   }
-  ['touchstart','mousedown','keydown'].forEach(ev => {
-    window.addEventListener(ev, () => {
-      if (audioCtx && audioCtx.state !== 'running') audioCtx.resume();
-    }, { once:true, passive:true });
-  });
 
   // ---------- Init UI ----------
   function syncUI(){
@@ -345,16 +370,16 @@
       const Ctx = window.AudioContext || window.webkitAudioContext;
       audioCtx = new Ctx();
     }
-    if(audioCtx.state==='suspended') audioCtx.resume();
+    try{ if(audioCtx.state==='suspended') audioCtx.resume(); }catch{}
     return audioCtx;
   }
 
-  function scheduleVisual(time, kind){
+  function scheduleVisual(time){
     if(!audioCtx) return;
     const ms = Math.max(0, (time - audioCtx.currentTime)*1000);
     setTimeout(()=>{
-      pulse.classList.toggle('active', false); // reset
-      void pulse.offsetWidth; // reflow hack
+      pulse.classList.toggle('active', false);
+      void pulse.offsetWidth;
       pulse.classList.add('active');
       pulse.classList.toggle('accent', (state.subIdx===1 && state.beatIdx===1 && state.mode==='practice'));
       beatInfo.textContent = state.beatIdx+'/'+state.beatsPerBar;
@@ -364,7 +389,7 @@
 
   function scheduleClick(time, kind){
     if(state.mode==='rest' && !state.soundOnRest){
-      scheduleVisual(time, kind);
+      scheduleVisual(time);
       return;
     }
     const ctx = audioCtx;
@@ -380,7 +405,7 @@
     gain.gain.exponentialRampToValueAtTime(0.0001, time+0.04);
     osc.connect(gain).connect(ctx.destination);
     osc.start(time); osc.stop(time+0.05);
-    scheduleVisual(time, kind);
+    scheduleVisual(time);
   }
 
   function schedulerTick(){
@@ -438,20 +463,6 @@
   function start(){
     if(state.running) return;
     ensureAudio();
-
-    // Beep corto de confirmación (garantiza que se oye algo en iOS)
-    (function testBeep(){
-      const t = audioCtx.currentTime + 0.02;
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = 'sine'; o.frequency.setValueAtTime(880, t);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.2, t + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
-      o.connect(g).connect(audioCtx.destination);
-      o.start(t); o.stop(t + 0.16);
-    })();
-
     state.running = true; state.paused=false;
     state.mode = 'practice'; state.round = 1;
     state.timeLeft = toSeconds(state.pracMin, state.pracSec);
@@ -499,7 +510,7 @@
     stop();
     state.bpm=100; state.beatsPerBar=4; state.subdivisions=1;
     state.pracMin=1; state.pracSec=0; state.restMin=0; state.restSec=30; state.rounds=5;
-    state.deltaBpm=0; state.maxBpm=300; state.volume=.5; state.soundOnRest=false; state.presetId='';
+    state.deltaBpm=0; state.maxBpm=300; state.volume=.6; state.soundOnRest=false; state.presetId='';
     persist('bpm',state.bpm); persist('beatsPerBar',state.beatsPerBar); persist('subdivisions',state.subdivisions);
     persist('practiceMin',state.pracMin); persist('practiceSec',state.pracSec);
     persist('restMin',state.restMin); persist('restSec',state.restSec);
@@ -550,9 +561,9 @@
   presetSel.addEventListener('change', e=>applyPreset(e.target.value));
   presetClear.addEventListener('click', ()=>{ presetSel.value=''; state.presetId=''; persist('presetId',''); });
 
-  btnStart.addEventListener('click', async () => { await unlockAudioCtx(); start(); });
+  btnStart.addEventListener('click', () => iosUnlockThen(start));
   btnPause.addEventListener('click', pause);
-  btnResume.addEventListener('click', async () => { await unlockAudioCtx(); resume(); });
+  btnResume.addEventListener('click', () => iosUnlockThen(resume));
   btnStop.addEventListener('click', stop);
   btnReset.addEventListener('click', reset);
 
@@ -585,11 +596,10 @@
     deferredPrompt = e;
     installBtn.style.display = 'block';
   });
-  installBtn.addEventListener('click', async () => {
+  installBtn.addEventListener('click', () => {
     installBtn.style.display = 'none';
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
     deferredPrompt = null;
   });
   window.addEventListener('appinstalled', () => {
